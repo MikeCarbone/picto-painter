@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pictogram Prepper 6000</title>
+    <meta name="description" content="description"/>
+    <meta name="author" content="author" />
+    <meta name="keywords" content="keywords" />
+    <style type="text/css">
+      body {
+        /* Palette of colors */
+        --skin-tone-fair-primary: #ffc6b4;
+        --skin-tone-fair-shadow: #ffab90;
+        --skin-tone-midtone-primary: #ecc19c;
+        --skin-tone-midtone-shadow: #dfb38b;
+        --skin-tone-dark-primary: #8a613e;
+        --skin-tone-dark-shadow: #764f2a;
+
+        /* Constants of our brand values broken into HSL values (don't need to include L) */
+        --brand-blue-h: 215;
+        --brand-blue-s: 100%;
+        --brand-red-h: 5;
+        --brand-red-s: 82%;
+        --brand-yellow-h: 36;
+        --brand-yellow-s: 78%;
+        --brand-green-h: 173;
+        --brand-green-s: 68%;
+
+        /* Active colors */
+        --active-h: var(--brand-blue-h);
+        --active-s: var(--brand-blue-s);
+
+        --skin-tone-primary: var(--skin-tone-midtone-primary);
+        --skin-tone-shadow: var(--skin-tone-midtone-shadow);
+      }
+      #svg-container {
+        width: 100%;
+      }
+      #svg-container svg {
+        cursor: crosshair;
+        height: 750px;
+        width: 100%;
+      }
+
+      path:hover,
+      rect:hover,
+      ellipse:hover {
+        stroke: red;
+        stroke-width: 0.75px;
+      }
+
+      .button-container {
+        display: none;
+        justify-content: center;
+      }
+      .button-container button {
+        margin: 0 16px;
+      }
+
+      .code-container {
+        display: none;
+        width: 80%;
+        margin: 0 auto;
+        padding: 50px;
+      }
+      
+      #code {
+        background-color: #eaeaea;
+        font-family: monospace;
+        min-height: 450px;
+        padding: 8px;
+        width: 100%;
+      }
+
+      .dropdown {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Welcome to Picto Prepper. Start by selecting light skin tone colors. Next, click the "toggle lightness selector" to highlight shadow skin tones. After you're done, click "convert".</p>
+    <p id="instructions">Highlight light skin tones</p>
+    <div id="input-container">
+      <label>Input SVG markup
+        <input id="svg-input" placeholder="<svg><path d='a123123.1231'" />
+      </label>
+      <button onclick="loadSvg()">Load SVG</button>
+    </div>
+    <div id="svg-container">
+    </div>
+    <div class="button-container">
+      <button onclick="convert()">Convert</button>
+      <button onclick="toggleLightnessBrush()">Toggle lightness selector</button>
+      <select onchange="handleThemeChange(this.options[this.selectedIndex].value)" class="dropdown">
+        <option value="blue">Blue</option>
+        <option value="green">Green</option>
+        <option value="red">Red</option>
+        <option value="yellow">Yellow</option>
+      </select>
+      <select onchange="handleSkinChange(this.options[this.selectedIndex].value)" class="dropdown">
+        <option value="fair">Fair</option>
+        <option value="midtone">Midtone</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+    <div class="code-container">
+      <textarea id="code"></textarea>
+    </div>
+  </body>
+  <script type="text/javascript">
+    function RGBToHSL (r, g, b) {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+      const l = Math.max(r, g, b);
+      const s = l - Math.min(r, g, b);
+      const h = s
+        ? l === r
+          ? (g - b) / s
+          : l === g
+          ? 2 + (b - r) / s
+          : 4 + (r - g) / s
+        : 0;
+      return [
+        60 * h < 0 ? 60 * h + 360 : 60 * h,
+        100 * (s ? (l <= 0.5 ? s / (2 * l - s) : s / (2 - (2 * l - s))) : 0),
+        (100 * (2 * l - s)) / 2,
+      ];
+    };
+
+    function hexToRgb(hex) {
+      // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+      var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+      hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+        return r + r + g + g + b + b;
+      });
+
+      var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');   // convert to Hex and prefix "0" if needed
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
+    function removePaint () {
+      paintedPaths.forEach(p => {
+        p.el.style.fill = p.fill;
+        p.el.style.stroke = p.stroke;
+      });
+    }
+
+    let useLightBrush = true;
+
+    // STEP 1 paint the skin color tones
+    // STEP 2 paint any other colors that should be constant between color variations
+    let paths = [];
+    let correctionPaths = [];
+    let paintedPaths = [];
+
+    // Here we want to switch the paths to use the new HSL variable
+    function convert () {
+      // Paths that we did not ignore
+      correctionPaths.forEach(p => {
+        // Get color of each path
+        const hexFill = p.getAttribute('fill');
+        // Handle fills
+        if (hexFill) {
+          if (hexFill.charAt(0) === "#"){
+            // Here we do calculations to change the fill to use the new brand HSL
+            const rgb = hexToRgb(hexFill);
+            // Convert RGB to HSL
+            const hsl = RGBToHSL(rgb.r, rgb.g, rgb.b);
+            // Keep L value, replace H and S with new constant
+            const newHsl = `hsl(var(--active-h), var(--active-s), ${hsl[2]}%)`;
+            // Convert back to Hex and fill in
+            p.setAttribute('fill', newHsl);
+          }
+        }
+        // Handle stroke
+        const hexStroke = p.getAttribute('stroke');
+        if (hexStroke) {
+          if (hexStroke.charAt(0) === "#"){
+            const rgb = hexToRgb(hexStroke);
+            const hsl = RGBToHSL(rgb.r, rgb.g, rgb.b);
+            // Keep L value, replace H and S with new constant
+            const newHsl = `hsl(var(--active-h), var(--active-s), ${hsl[2]}%)`;
+            p.setAttribute('stroke', newHsl);
+          }
+        }
+      });
+      // Show the code
+      copySvg();
+
+      // Remove paint
+      removePaint();
+    }
+
+    function toggleLightnessBrush () {
+      useLightBrush = !useLightBrush
+      const instructions = document.getElementById("instructions");
+      instructions.innerText = useLightBrush ? "Highlight light skin tones" : "Highlight dark skin tones";
+    }
+
+    function copySvg () {
+      const svg = document.getElementById('svg-container');
+      document.getElementById('code').innerText = svg.innerHTML;
+      document.getElementsByClassName('code-container')[0].style.display = "block";
+      Array.from(document.getElementsByClassName('dropdown')).forEach(el => el.style.display = "block")
+    }
+
+    function handleSkinChange(e) {  
+      document.body.style.setProperty('--skin-tone-primary', `var(--skin-tone-${e}-primary)`);
+      document.body.style.setProperty('--skin-tone-shadow', `var(--skin-tone-${e}-shadow)`);
+    }
+
+    function handleThemeChange(e) {  
+      document.body.style.setProperty('--active-h', `var(--brand-${e}-h)`);
+      document.body.style.setProperty('--active-s', `var(--brand-${e}-s)`);
+    }
+
+    function loadSvg () {
+      // Unhide interaction buttons
+      document.getElementsByClassName('button-container')[0].style.display = "flex";
+
+      // Get the markup
+      const svg = document.getElementById('svg-input').value;
+      const displayContainer = document.getElementById('svg-container');
+      displayContainer.innerHTML = svg;
+      document.getElementById('input-container').style.display = "none";
+
+      // Prepare our path arrays
+      // In their final state, paths will be all paths without skintones,
+      // and correctionPaths will be all paths with skin tones
+      // paintedPaths will be a store of objects that tells us what was painted and what it used to look like
+      paths = Array.from(document.getElementsByTagName('svg')[0].childNodes).filter(n => n.nodeName !== "#text");
+      correctionPaths = Array.from(document.getElementsByTagName('svg')[0].childNodes).filter(n => n.nodeName !== "#text");
+      paintedPaths = [];
+
+      paths.forEach(p => {
+        p.addEventListener('click', (e) => {
+          const target = e.target;
+          correctionPaths = correctionPaths.filter(t => t !== target);
+          const originalFill = target.getAttribute('fill');
+          const originalStroke = target.getAttribute('stroke');
+          const variableString = useLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalStroke})`;
+          // Temporarily paint it with a very visible color so we know we're blocking it out
+          target.style.fill = useLightBrush ? '#eb34e1' : '#ab0ea2';
+          // Store the original color, this is where we make sure the new color gets consumed
+          paintedPaths.push({
+            stroke: !originalStroke ? undefined : useLightBrush ? `var(--skin-tone-primary, ${originalStroke})` : `var(--skin-tone-shadow, ${originalStroke})`,
+            fill: !originalFill ? undefined : useLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalFill})`,
+            el: target
+          });
+        });
+      });
+    }
+    // We paint non-color-branded areas
+    // We fill that area with CSS variables
+    // We need a paint brush for light skin and dark skin
+  </script>
+</html>
