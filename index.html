@@ -32,10 +32,26 @@
 
         --skin-tone-primary: var(--skin-tone-midtone-primary);
         --skin-tone-shadow: var(--skin-tone-midtone-shadow);
+
+        font-size: 16px;
+        font-family: sans-serif;
       }
+
+      button {
+        background-color: #04337A;
+        border-radius: 5px;
+        color: white;
+        cursor: pointer;
+        border: none;
+        outline: none;
+        padding: 12px 16px;
+        font-weight: bold;
+      }
+
       #svg-container {
         width: 100%;
       }
+
       #svg-container svg {
         cursor: crosshair;
         height: 750px;
@@ -53,6 +69,7 @@
         display: none;
         justify-content: center;
       }
+
       .button-container button {
         margin: 0 16px;
       }
@@ -75,10 +92,22 @@
       .dropdown {
         display: none;
       }
+
+      select {
+        margin: 0 8px;
+      }
+
+      #instructions {
+        display: none;
+        font-size: 24px;
+        font-weight: bold;
+        margin: 50px 0;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
-    <p>Welcome to Picto Prepper. Start by selecting light skin tone colors. Next, click the "toggle lightness selector" to highlight shadow skin tones. After you're done, click "convert".</p>
+    <p>Welcome to Picto Prepper. Paint out the colors as specified in the dropdown. After you're done, click "convert".</p>
     <p id="instructions">Highlight light skin tones</p>
     <div id="input-container">
       <label>Input SVG markup
@@ -90,7 +119,11 @@
     </div>
     <div class="button-container">
       <button onclick="convert()">Convert</button>
-      <button onclick="toggleLightnessBrush()">Toggle lightness selector</button>
+      <select onchange="switchBrush(this.options[this.selectedIndex].value)">
+        <option value="highlight-primary">Highlight primary skin tone colors</option>
+        <option value="highlight-shadow">Highlight shadow skin tone colors</option>
+        <option value="highlight-constant">Highlight constant colors</option>
+      </select>
       <select onchange="handleThemeChange(this.options[this.selectedIndex].value)" class="dropdown">
         <option value="blue">Blue</option>
         <option value="green">Green</option>
@@ -159,15 +192,20 @@
         p.el.style.fill = p.fill;
         p.el.style.stroke = p.stroke;
       });
+      ignoredPaths.forEach(p => {
+        p.el.style.fill = p.fill;
+        p.el.style.stroke = p.stroke;
+      });
     }
 
-    let useLightBrush = true;
+    let activeBrush = "highlight-primary";
 
     // STEP 1 paint the skin color tones
     // STEP 2 paint any other colors that should be constant between color variations
     let paths = [];
     let correctionPaths = [];
     let paintedPaths = [];
+    let ignoredPaths = [];
 
     // Here we want to switch the paths to use the new HSL variable
     function convert () {
@@ -207,10 +245,20 @@
       removePaint();
     }
 
-    function toggleLightnessBrush () {
-      useLightBrush = !useLightBrush
+    function switchBrush (value) {
+      activeBrush = value;
       const instructions = document.getElementById("instructions");
-      instructions.innerText = useLightBrush ? "Highlight light skin tones" : "Highlight dark skin tones";
+      switch (value) {
+        case "highlight-primary":
+          instructions.innerText = "Highlight light skin tones";
+          break;
+        case "highlight-shadow":
+          instructions.innerText = "Highlight dark skin tones";
+          break;
+        case "highlight-constant":
+          instructions.innerText = "Highlight colors that don't change between drawings";
+          break;
+      }
     }
 
     function copySvg () {
@@ -233,7 +281,10 @@
     function loadSvg () {
       // Unhide interaction buttons
       document.getElementsByClassName('button-container')[0].style.display = "flex";
-
+      
+      // Unhide instructions
+      document.getElementById('instructions').style.display = "block";
+      
       // Get the markup
       const svg = document.getElementById('svg-input').value;
       const displayContainer = document.getElementById('svg-container');
@@ -247,6 +298,7 @@
       paths = Array.from(document.getElementsByTagName('svg')[0].childNodes).filter(n => n.nodeName !== "#text");
       correctionPaths = Array.from(document.getElementsByTagName('svg')[0].childNodes).filter(n => n.nodeName !== "#text");
       paintedPaths = [];
+      ignoredPaths = [];
 
       paths.forEach(p => {
         p.addEventListener('click', (e) => {
@@ -254,13 +306,23 @@
           correctionPaths = correctionPaths.filter(t => t !== target);
           const originalFill = target.getAttribute('fill');
           const originalStroke = target.getAttribute('stroke');
-          const variableString = useLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalStroke})`;
+          if (activeBrush === "highlight-constant") {
+            target.style.fill = 'pink';
+            ignoredPaths.push({
+              stroke: originalStroke,
+              fill: originalFill,
+              el: target
+            });
+            return;
+          }
+          const usingLightBrush = activeBrush === "highlight-primary";
+          const variableString = usingLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalStroke})`;
           // Temporarily paint it with a very visible color so we know we're blocking it out
-          target.style.fill = useLightBrush ? '#eb34e1' : '#ab0ea2';
+          target.style.fill = usingLightBrush ? '#eb34e1' : '#ab0ea2';
           // Store the original color, this is where we make sure the new color gets consumed
           paintedPaths.push({
-            stroke: !originalStroke ? undefined : useLightBrush ? `var(--skin-tone-primary, ${originalStroke})` : `var(--skin-tone-shadow, ${originalStroke})`,
-            fill: !originalFill ? undefined : useLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalFill})`,
+            stroke: !originalStroke ? undefined : usingLightBrush ? `var(--skin-tone-primary, ${originalStroke})` : `var(--skin-tone-shadow, ${originalStroke})`,
+            fill: !originalFill ? undefined : usingLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalFill})`,
             el: target
           });
         });
