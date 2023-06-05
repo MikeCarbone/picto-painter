@@ -9,12 +9,12 @@
     <style type="text/css">
       body {
         /* Palette of colors */
-        --skin-tone-fair-primary: #ffc6b4;
-        --skin-tone-fair-shadow: #ffab90;
-        --skin-tone-midtone-primary: #ecc19c;
-        --skin-tone-midtone-shadow: #dfb38b;
-        --skin-tone-dark-primary: #8a613e;
-        --skin-tone-dark-shadow: #764f2a;
+        --active-skin-tone-fair-primary: #ffc6b4;
+        --active-skin-tone-fair-shadow: #ffab90;
+        --active-skin-tone-midtone-primary: #ecc19c;
+        --active-skin-tone-midtone-shadow: #dfb38b;
+        --active-skin-tone-dark-primary: #8a613e;
+        --active-skin-tone-dark-shadow: #764f2a;
 
         /* Constants of our brand values broken into HSL values (don't need to include L) */
         --brand-blue-h: 215;
@@ -27,11 +27,11 @@
         --brand-green-s: 68%;
 
         /* Active colors */
-        --active-h: var(--brand-blue-h);
-        --active-s: var(--brand-blue-s);
+        --angelou-active-h: var(--brand-blue-h);
+        --angelou-active-s: var(--brand-blue-s);
 
-        --skin-tone-primary: var(--skin-tone-midtone-primary);
-        --skin-tone-shadow: var(--skin-tone-midtone-shadow);
+        --angelou-active-skin-tone-primary: var(--active-skin-tone-midtone-primary);
+        --angelou-active-skin-tone-shadow: var(--active-skin-tone-midtone-shadow);
 
         font-size: 16px;
         font-family: sans-serif;
@@ -238,11 +238,19 @@
           }
         }
       });
-      // Show the code
-      copySvg();
+      // Set default variables
+      // active-h and active-s are local
+      // set them to consume --angelou-active-h, --angelou-active-s
+      document.getElementsByTagName('svg')[0].style.setProperty('--active-skin-tone-primary', 'var(--angelou-active-skin-tone-primary, #8a613e)');
+      document.getElementsByTagName('svg')[0].style.setProperty('--active-skin-tone-shadow', 'var(--angelou-active-skin-tone-shadow, #764f2a)');
+      document.getElementsByTagName('svg')[0].style.setProperty('--active-h', 'var(--angelou-active-h, 215)');
+      document.getElementsByTagName('svg')[0].style.setProperty('--active-s', 'var(--angelou-active-s, 100%)');
 
       // Remove paint
       removePaint();
+
+      // Show the code
+      copySvg();
     }
 
     function switchBrush (value) {
@@ -269,22 +277,24 @@
     }
 
     function handleSkinChange(e) {  
-      document.body.style.setProperty('--skin-tone-primary', `var(--skin-tone-${e}-primary)`);
-      document.body.style.setProperty('--skin-tone-shadow', `var(--skin-tone-${e}-shadow)`);
+      const svg = document.getElementsByTagName('svg')[0];
+      svg.style.setProperty('--active-skin-tone-primary', `var(--active-skin-tone-${e}-primary)`);
+      svg.style.setProperty('--active-skin-tone-shadow', `var(--active-skin-tone-${e}-shadow)`);
     }
 
     function handleThemeChange(e) {  
-      document.body.style.setProperty('--active-h', `var(--brand-${e}-h)`);
-      document.body.style.setProperty('--active-s', `var(--brand-${e}-s)`);
+      const svg = document.getElementsByTagName('svg')[0];
+      svg.style.setProperty('--active-h', `var(--brand-${e}-h)`);
+      svg.style.setProperty('--active-s', `var(--brand-${e}-s)`);
     }
 
     function loadSvg () {
       // Unhide interaction buttons
       document.getElementsByClassName('button-container')[0].style.display = "flex";
-      
+
       // Unhide instructions
       document.getElementById('instructions').style.display = "block";
-      
+
       // Get the markup
       const svg = document.getElementById('svg-input').value;
       const displayContainer = document.getElementById('svg-container');
@@ -316,13 +326,13 @@
             return;
           }
           const usingLightBrush = activeBrush === "highlight-primary";
-          const variableString = usingLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalStroke})`;
+          const variableString = usingLightBrush ? `var(--active-skin-tone-primary, ${originalFill})` : `var(--active-skin-tone-shadow, ${originalStroke})`;
           // Temporarily paint it with a very visible color so we know we're blocking it out
           target.style.fill = usingLightBrush ? '#eb34e1' : '#ab0ea2';
           // Store the original color, this is where we make sure the new color gets consumed
           paintedPaths.push({
-            stroke: !originalStroke ? undefined : usingLightBrush ? `var(--skin-tone-primary, ${originalStroke})` : `var(--skin-tone-shadow, ${originalStroke})`,
-            fill: !originalFill ? undefined : usingLightBrush ? `var(--skin-tone-primary, ${originalFill})` : `var(--skin-tone-shadow, ${originalFill})`,
+            stroke: !originalStroke ? undefined : usingLightBrush ? `var(--active-skin-tone-primary, ${originalStroke})` : `var(--active-skin-tone-shadow, ${originalStroke})`,
+            fill: !originalFill ? undefined : usingLightBrush ? `var(--active-skin-tone-primary, ${originalFill})` : `var(--active-skin-tone-shadow, ${originalFill})`,
             el: target
           });
         });
