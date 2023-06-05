@@ -9,12 +9,12 @@
     <style type="text/css">
       body {
         /* Palette of colors */
-        --active-skin-tone-fair-primary: #ffc6b4;
-        --active-skin-tone-fair-shadow: #ffab90;
-        --active-skin-tone-midtone-primary: #ecc19c;
-        --active-skin-tone-midtone-shadow: #dfb38b;
-        --active-skin-tone-dark-primary: #8a613e;
-        --active-skin-tone-dark-shadow: #764f2a;
+        --skin-tone-fair-primary: #ffc6b4;
+        --skin-tone-fair-shadow: #ffab90;
+        --skin-tone-midtone-primary: #ecc19c;
+        --skin-tone-midtone-shadow: #dfb38b;
+        --skin-tone-dark-primary: #8a613e;
+        --skin-tone-dark-shadow: #764f2a;
 
         /* Constants of our brand values broken into HSL values (don't need to include L) */
         --brand-blue-h: 215;
@@ -30,8 +30,8 @@
         --angelou-active-h: var(--brand-blue-h);
         --angelou-active-s: var(--brand-blue-s);
 
-        --angelou-active-skin-tone-primary: var(--active-skin-tone-midtone-primary);
-        --angelou-active-skin-tone-shadow: var(--active-skin-tone-midtone-shadow);
+        --angelou-active-skin-tone-primary: var(--skin-tone-fair-primary);
+        --angelou-active-skin-tone-shadow: var(--skin-tone-fair-shadow);
 
         font-size: 16px;
         font-family: sans-serif;
@@ -250,7 +250,7 @@
       removePaint();
 
       // Show the code
-      copySvg();
+      renderCode();
     }
 
     function switchBrush (value) {
@@ -269,23 +269,43 @@
       }
     }
 
-    function copySvg () {
+    function renderCode () {
       const svg = document.getElementById('svg-container');
       document.getElementById('code').innerText = svg.innerHTML;
       document.getElementsByClassName('code-container')[0].style.display = "block";
       Array.from(document.getElementsByClassName('dropdown')).forEach(el => el.style.display = "block")
     }
 
-    function handleSkinChange(e) {  
+    function handleSkinChange(e) {
       const svg = document.getElementsByTagName('svg')[0];
-      svg.style.setProperty('--active-skin-tone-primary', `var(--active-skin-tone-${e}-primary)`);
-      svg.style.setProperty('--active-skin-tone-shadow', `var(--active-skin-tone-${e}-shadow)`);
+      // We update our SVG code to set the current value as the default backup
+      // Still customizable via CSS variables, but predictable
+      const primaryVar = `--skin-tone-${e}-primary`;
+      const shadowVar = `--skin-tone-${e}-shadow`;
+      const computedStyle = window.getComputedStyle(document.body);
+      const backupPrimary = computedStyle.getPropertyValue(primaryVar);
+      const backupShadow = computedStyle.getPropertyValue(shadowVar);
+      svg.style.setProperty('--active-skin-tone-primary', `var(${primaryVar}, ${backupPrimary})`);
+      svg.style.setProperty('--active-skin-tone-shadow', `var(${shadowVar}, ${backupShadow})`);
+
+      // Updates the code at the bottom
+      renderCode();
     }
 
     function handleThemeChange(e) {  
       const svg = document.getElementsByTagName('svg')[0];
-      svg.style.setProperty('--active-h', `var(--brand-${e}-h)`);
-      svg.style.setProperty('--active-s', `var(--brand-${e}-s)`);
+      // We update our SVG code to set the current value as the default backup
+      // Still customizable via CSS variables, but predictable
+      const hVar = `--brand-${e}-h`;
+      const sVar = `--brand-${e}-s`;
+      const computedStyle = window.getComputedStyle(document.body);
+      const backupH = computedStyle.getPropertyValue(hVar);
+      const backupS = computedStyle.getPropertyValue(sVar);
+      svg.style.setProperty('--active-h', `var(${hVar}, ${backupH})`);
+      svg.style.setProperty('--active-s', `var(--brand-${e}-s, ${backupS})`);
+
+      // Updates the code at the bottom
+      renderCode();
     }
 
     function loadSvg () {
@@ -338,8 +358,5 @@
         });
       });
     }
-    // We paint non-color-branded areas
-    // We fill that area with CSS variables
-    // We need a paint brush for light skin and dark skin
   </script>
 </html>
