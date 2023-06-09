@@ -209,42 +209,60 @@
 
     // Here we want to switch the paths to use the new HSL variable
     function convert () {
+
+      // Get the backup color
+      // This is so the SVG functions via copy/paste in outside contexts
+      const computedStyle = window.getComputedStyle(document.body);
+      const backupH = computedStyle.getPropertyValue(`--angelou-active-h`);
+      const backupS = computedStyle.getPropertyValue(`--angelou-active-s`);
+
       // Paths that we did not ignore
       correctionPaths.forEach(p => {
         // Get color of each path
-        const hexFill = p.getAttribute('fill');
+        const existingFill = p.getAttribute('fill');
         // Handle fills
-        if (hexFill) {
-          if (hexFill.charAt(0) === "#"){
+        if (existingFill) {
+          if (existingFill.charAt(0) === "#") {
             // Here we do calculations to change the fill to use the new brand HSL
-            const rgb = hexToRgb(hexFill);
+            const rgb = hexToRgb(existingFill);
             // Convert RGB to HSL
             const hsl = RGBToHSL(rgb.r, rgb.g, rgb.b);
             // Keep L value, replace H and S with new constant
-            const newHsl = `hsl(var(--active-h), var(--active-s), ${hsl[2]}%)`;
+            const newHsl = `hsl(var(--angelou-active-h, ${backupH}), var(--angelou-active-s, ${backupS}), ${hsl[2]}%)`;
             // Convert back to Hex and fill in
+            p.setAttribute('fill', newHsl);
+          }
+          // Handle HSL replacements for subsequent conversions
+          if (existingFill.substring(0, 4) === 'hsl(') {
+            // Maintain the old lightness value already calculated
+            const oldL = existingFill.split(',')[4];
+            // Remove extra characters
+            const formattedL = oldL.substring(1, oldL.length - 1);
+            const newHsl = `hsl(var(--angelou-active-h, ${backupH}), var(--angelou-active-s, ${backupS}), ${formattedL})`;
             p.setAttribute('fill', newHsl);
           }
         }
         // Handle stroke
-        const hexStroke = p.getAttribute('stroke');
-        if (hexStroke) {
-          if (hexStroke.charAt(0) === "#"){
-            const rgb = hexToRgb(hexStroke);
+        const existingStroke = p.getAttribute('stroke');
+        if (existingStroke) {
+          if (existingStroke.charAt(0) === "#"){
+            const rgb = hexToRgb(existingStroke);
             const hsl = RGBToHSL(rgb.r, rgb.g, rgb.b);
             // Keep L value, replace H and S with new constant
-            const newHsl = `hsl(var(--active-h), var(--active-s), ${hsl[2]}%)`;
+            const newHsl = `hsl(var(--angelou-active-h, ${backupH}), var(--angelou-active-s, ${backupS}), ${hsl[2]}%)`;
+            p.setAttribute('stroke', newHsl);
+          }
+          // Handle HSL replacements for subsequent conversions
+          if (existingStroke.substring(0, 4) === 'hsl(') {
+            // Maintain the old lightness value already calculated
+            const oldL = existingStroke.split(',')[4];
+            // Remove extra characters
+            const formattedL = oldL.substring(1, oldL.length - 1);
+            const newHsl = `hsl(var(--angelou-active-h, ${backupH}), var(--angelou-active-s, ${backupS}), ${formattedL})`;
             p.setAttribute('stroke', newHsl);
           }
         }
       });
-      // Set default variables
-      // active-h and active-s are local
-      // set them to consume --angelou-active-h, --angelou-active-s
-      document.getElementsByTagName('svg')[0].style.setProperty('--active-skin-tone-primary', 'var(--angelou-active-skin-tone-primary, #8a613e)');
-      document.getElementsByTagName('svg')[0].style.setProperty('--active-skin-tone-shadow', 'var(--angelou-active-skin-tone-shadow, #764f2a)');
-      document.getElementsByTagName('svg')[0].style.setProperty('--active-h', 'var(--angelou-active-h, 215)');
-      document.getElementsByTagName('svg')[0].style.setProperty('--active-s', 'var(--angelou-active-s, 100%)');
 
       // Remove paint
       removePaint();
@@ -269,6 +287,7 @@
       }
     }
 
+    // Updates code at the bottom to show the most recent SVG
     function renderCode () {
       const svg = document.getElementById('svg-container');
       document.getElementById('code').innerText = svg.innerHTML;
@@ -277,7 +296,6 @@
     }
 
     function handleSkinChange(e) {
-      const svg = document.getElementsByTagName('svg')[0];
       // We update our SVG code to set the current value as the default backup
       // Still customizable via CSS variables, but predictable
       const primaryVar = `--skin-tone-${e}-primary`;
@@ -285,27 +303,24 @@
       const computedStyle = window.getComputedStyle(document.body);
       const backupPrimary = computedStyle.getPropertyValue(primaryVar);
       const backupShadow = computedStyle.getPropertyValue(shadowVar);
-      svg.style.setProperty('--active-skin-tone-primary', `var(${primaryVar}, ${backupPrimary})`);
-      svg.style.setProperty('--active-skin-tone-shadow', `var(${shadowVar}, ${backupShadow})`);
+      document.body.style.setProperty('--angelou-active-skin-tone-primary', `var(${primaryVar}, ${backupPrimary})`);
+      document.body.style.setProperty('--angelou-active-skin-tone-shadow', `var(${shadowVar}, ${backupShadow})`);
 
-      // Updates the code at the bottom
-      renderCode();
+      // Recalculate fallback colors and update code at the bottom
+      convert();
     }
 
     function handleThemeChange(e) {  
-      const svg = document.getElementsByTagName('svg')[0];
-      // We update our SVG code to set the current value as the default backup
-      // Still customizable via CSS variables, but predictable
       const hVar = `--brand-${e}-h`;
       const sVar = `--brand-${e}-s`;
       const computedStyle = window.getComputedStyle(document.body);
       const backupH = computedStyle.getPropertyValue(hVar);
       const backupS = computedStyle.getPropertyValue(sVar);
-      svg.style.setProperty('--active-h', `var(${hVar}, ${backupH})`);
-      svg.style.setProperty('--active-s', `var(--brand-${e}-s, ${backupS})`);
+      document.body.style.setProperty('--angelou-active-h', `var(${hVar})`);
+      document.body.style.setProperty('--angelou-active-s', `var(${sVar})`);
 
-      // Updates the code at the bottom
-      renderCode();
+      // Recalculate fallback colors and update code at the bottom
+      convert();
     }
 
     function loadSvg () {
@@ -346,13 +361,13 @@
             return;
           }
           const usingLightBrush = activeBrush === "highlight-primary";
-          const variableString = usingLightBrush ? `var(--active-skin-tone-primary, ${originalFill})` : `var(--active-skin-tone-shadow, ${originalStroke})`;
+          const variableString = usingLightBrush ? `var(--angelou-active-skin-tone-primary, ${originalFill})` : `var(--active-skin-tone-shadow, ${originalStroke})`;
           // Temporarily paint it with a very visible color so we know we're blocking it out
           target.style.fill = usingLightBrush ? '#eb34e1' : '#ab0ea2';
           // Store the original color, this is where we make sure the new color gets consumed
           paintedPaths.push({
-            stroke: !originalStroke ? undefined : usingLightBrush ? `var(--active-skin-tone-primary, ${originalStroke})` : `var(--active-skin-tone-shadow, ${originalStroke})`,
-            fill: !originalFill ? undefined : usingLightBrush ? `var(--active-skin-tone-primary, ${originalFill})` : `var(--active-skin-tone-shadow, ${originalFill})`,
+            stroke: !originalStroke ? undefined : usingLightBrush ? `var(--angelou-active-skin-tone-primary, ${originalStroke})` : `var(--angelou-active-skin-tone-shadow, ${originalStroke})`,
+            fill: !originalFill ? undefined : usingLightBrush ? `var(--angelou-active-skin-tone-primary, ${originalFill})` : `var(--angelou-active-skin-tone-shadow, ${originalFill})`,
             el: target
           });
         });
